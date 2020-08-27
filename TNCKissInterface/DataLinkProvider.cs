@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Timers;
 
@@ -839,8 +838,6 @@ namespace TNCKissInterface
             Support.DbgPrint("TestCommandTimeout timer fired...");
             linkTestQ.Wakeup();
             timerTestCommandTimeout.Stop();
-            return;
-
         }
 
         //
@@ -851,8 +848,6 @@ namespace TNCKissInterface
             Support.DbgPrint("Segmenter timer fired...");
             recvDatagramQ.Wakeup();
             timerSegmenter.Stop();
-            return;
-
         }
 
         //
@@ -869,7 +864,6 @@ namespace TNCKissInterface
             {
                 timerBeacon.Stop();
             }
-            return;
         }
     }
 }

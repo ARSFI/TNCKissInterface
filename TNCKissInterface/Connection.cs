@@ -1,11 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Timers;
-using System.ComponentModel;
-using System.Windows.Forms;
-using System.Diagnostics;
 
 namespace TNCKissInterface
 {
