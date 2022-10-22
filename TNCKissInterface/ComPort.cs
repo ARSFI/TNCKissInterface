@@ -1,11 +1,8 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Collections.Generic;
-using System.Text;
 using System.IO.Ports;
-using System.Threading;
-using System.Reflection;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace TNCKissInterface
 {
