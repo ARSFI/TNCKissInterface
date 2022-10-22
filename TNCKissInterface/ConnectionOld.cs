@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Timers;
+using System.ComponentModel;
+using System.Windows.Forms;
+using System.Diagnostics;
 
 namespace TNCKissInterface
 {
@@ -2371,24 +2375,11 @@ namespace TNCKissInterface
                             return;
                         }
 
+                        
                         //
                         // Resend the unacked packets
                         //
-
-                        // I don't think we should if remote busy      JNW Feb 2022
-
-                        if (remoteBusy)
-                        {
-                            // Don't send, but set 10 second timer to poll for change in RNR
-                            // to prevent a hang if the RR clearing busy is missed
-
-                            timerAck.Stop();
-                            timerAck.SetTime(10000, false);
-                            timerAck.Start();
-                        }
-                        else
-                            InvokeRetransmission("In timer recovery");
-
+                        InvokeRetransmission("In timer recovery");
                         return;
                     }
 
