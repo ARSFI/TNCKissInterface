@@ -249,6 +249,13 @@ namespace TNCKissInterface
         public void Close()
         {
             runFlag = false;
+
+            // 2026-07-02 W4PHS: The provider owns these timers for its full lifetime.
+            // Dispose them at terminal Close after blocking new provider work.
+            DisposeTimer(timerSegmenter);
+            DisposeTimer(timerTestCommandTimeout);
+            DisposeTimer(timerBeacon);
+
             dataLinkProviderQ.enabled = false;
             recvDatagramQ.enabled = false;
             linkTestQ.enabled = false;
@@ -259,6 +266,20 @@ namespace TNCKissInterface
             }
             Thread.Sleep(200);   // Give Close a chance to finish.  W4PHS 23-Jan-2015
             _localTncChannel.RemoveProvider(this);
+        }
+
+        private static void DisposeTimer(Timer timer)
+        {
+            // 2026-07-02 W4PHS: Continue provider shutdown if an individual timer
+            // throws while releasing its resources.
+            try
+            {
+                if (timer != null)
+                    timer.Dispose();
+            }
+            catch
+            {
+            }
         }
 
         public Connection CreateConnection()

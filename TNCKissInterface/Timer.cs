@@ -8,16 +8,17 @@ namespace TNCKissInterface
     //
     // Copyright 2008, 2009 - Peter R. Woods (N6PRW)
     //
-    public class Timer
+    public class Timer : IDisposable
     {
         Random timeRandom = new Random();
         Object syncLock = new Object();
         System.Timers.Timer timerT;
+        ElapsedEventHandler timerHandler;
         String tName;
 
         public Boolean Enabled
         {
-            get { return timerT.Enabled; }
+            get { lock (syncLock) { return timerT != null && timerT.Enabled; } }
         }
 
         public String timerName
@@ -31,7 +32,8 @@ namespace TNCKissInterface
             timerT.AutoReset = true;
             timerT.Enabled = false;
             timerT.Elapsed += timerT_Elapsed;
-            timerT.Elapsed += eHandler;
+            timerHandler = eHandler;
+            timerT.Elapsed += timerHandler;
             tName = name;
         }
 
@@ -47,6 +49,8 @@ namespace TNCKissInterface
         {
             lock (syncLock)
             {
+                if (timerT == null)
+                    return;
                 if (variable)
                 {
                     //
@@ -64,6 +68,8 @@ namespace TNCKissInterface
         {
             lock (syncLock)
             {
+                if (timerT == null)
+                    return;
                 timerT.Stop();
             }
             Support.DbgPrint("Timer " + tName + " Stopped");
@@ -72,7 +78,9 @@ namespace TNCKissInterface
         public void Start()
         {
             lock (syncLock)
-            { 
+            {
+                if (timerT == null)
+                    return;
                 timerT.Start();
             }
             Support.DbgPrint("Timer " + tName + " Started");
@@ -86,6 +94,31 @@ namespace TNCKissInterface
                 Start();
             }
             Support.DbgPrint("Timer " + tName + " Restarted");
+        }
+
+        public void Dispose()
+        {
+            lock (syncLock)
+            {
+                if (timerT == null)
+                    return;
+
+                // 2026-07-02 W4PHS: These wrappers are created for each connection/provider.
+                // Release the underlying System.Timers.Timer at terminal owner shutdown instead
+                // of only stopping it and retaining its native resources and event handlers.
+                timerT.Stop();
+                timerT.Elapsed -= timerT_Elapsed;
+                timerT.Elapsed -= timerHandler;
+                try
+                {
+                    timerT.Dispose();
+                }
+                catch
+                {
+                }
+                timerT = null;
+                timerHandler = null;
+            }
         }
     }
 }

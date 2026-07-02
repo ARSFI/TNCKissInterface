@@ -661,13 +661,15 @@ namespace TNCKissInterface
 
         public void Close()
         {
-            timerAck.Stop();
-            timerPoll.Stop();
-            timerSegmenter.Stop();
-            timerXID.Stop();
-            timerPendingAck.Stop();
-
             runFlag = false;
+
+            // 2026-07-02 W4PHS: A Connection owns these timers for its full lifetime.
+            // Dispose them only at terminal Close so disconnect/reconnect reuse is preserved.
+            DisposeTimer(timerAck);
+            DisposeTimer(timerPoll);
+            DisposeTimer(timerSegmenter);
+            DisposeTimer(timerXID);
+            DisposeTimer(timerPendingAck);
 
             //
             // Disable the queues and release any waiting blocked threads
@@ -687,6 +689,20 @@ namespace TNCKissInterface
             toSendQ.Wakeup();
             receiveDataAvailable.Set();
             dataLinkProvider.RemoveConnection(this);
+        }
+
+        private static void DisposeTimer(Timer timer)
+        {
+            // 2026-07-02 W4PHS: A failed timer cleanup must not prevent the remaining
+            // connection resources from being released.
+            try
+            {
+                if (timer != null)
+                    timer.Dispose();
+            }
+            catch
+            {
+            }
         }
 
         void ConnectionInit()
