@@ -202,42 +202,75 @@ namespace TNCKissInterface
             stationBytes[6] = (Byte)((stationSSID << 1) | 0x60);
         }
 
-        StationIDInfo Validate(String stationID)
+        /*
+         * Returns true when stationID has the callsign format accepted by SetCallSign().
+         * This lets receive code reject corrupt over-the-air address fields before it
+         * assigns them to a listener connection.
+         */
+        public static Boolean IsValidCallSign(String stationID)
         {
-            //
-            // Validate the format and characters in the incoming callsign.  Throws an exception if any illegal 
-            // characters are found or the format is invalid
-            //
             Char[] s1 = { '-' };
             String validChar = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
-            Int32 i;
-            Exception ex = new Exception("Bad callsign supplied:" + stationID);
-            StationIDInfo retID = new StationIDInfo();
+            Int32 ssid;
 
+            /* A missing callsign cannot be used to create a station address. */
+            if (stationID == null)
+            {
+                return false;
+            }
+
+            /* Match the case and whitespace normalization used by SetCallSign(). */
             stationID = stationID.ToUpper().Trim();
 
+            /* Reject characters that cannot be represented in a station callsign. */
             foreach (Char c in stationID)
             {
                 if (!validChar.Contains(c.ToString()))
                 {
-                    throw ex;
+                    return false;
                 }
             }
 
             String[] a = stationID.Split(s1);
 
+            /* Only one optional SSID separator is allowed, and the callsign is at most six characters. */
             if ((a.Length > 2) || (a[0].Length > 6))
+            {
+                return false;
+            }
+
+            /* Verify that a supplied SSID can be parsed and is in the accepted range. */
+            if ((a.Length == 2) && ((!Int32.TryParse(a[1], out ssid)) || (ssid > 15)))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        StationIDInfo Validate(String stationID)
+        {
+            //
+            // Validate the format and characters in the incoming callsign.  Throws an exception if any illegal
+            // characters are found or the format is invalid
+            //
+            Char[] s1 = { '-' };
+            Int32 i;
+            Exception ex = new Exception("Bad callsign supplied:" + stationID);
+            StationIDInfo retID = new StationIDInfo();
+
+            if (!IsValidCallSign(stationID))
             {
                 throw ex;
             }
 
+            stationID = stationID.ToUpper().Trim();
+
+            String[] a = stationID.Split(s1);
+
             if (a.Length == 2)
             {
                 retID.staSSID = Convert.ToInt32(a[1]);
-                if (retID.staSSID > 15)
-                {
-                    throw ex;
-                }
             }
 
             retID.staString = a[0] + "-" + retID.staSSID.ToString();

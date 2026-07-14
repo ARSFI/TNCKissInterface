@@ -803,8 +803,23 @@ namespace TNCKissInterface
                         con = GetConnection(packet.receivedFrame.staLink.GetConnectionPathRev());
                         if (con == null)
                         {
+                            /*
+                             * 2026-07-13: Reject corrupt received callsign fields before selecting a listener.
+                             * This prevents an invalid over-the-air address from throwing in SetCallSign()
+                             * after GetAvailableConnection() has cleared the listener's prior station path.
+                             */
+                            if ((!StationAddress.IsValidCallSign(packet.receivedFrame.staLink.sourceStation.stationIDString)) ||
+                                ((packet.receivedFrame.staLink.relayStation1.stationIDString.Length > 0) &&
+                                 (!StationAddress.IsValidCallSign(packet.receivedFrame.staLink.relayStation1.stationIDString))) ||
+                                ((packet.receivedFrame.staLink.relayStation2.stationIDString.Length > 0) &&
+                                 (!StationAddress.IsValidCallSign(packet.receivedFrame.staLink.relayStation2.stationIDString))))
+                            {
+                                Support.DbgPrint(Thread.CurrentThread.Name + " - Invalid callsign in received frame");
+                                continue;
+                            }
+
                             //
-                            // No existing connection available, so check for any listeners
+                            // No existing connection available, so check for any listeners.
                             //
                             con = GetAvailableConnection(packet.receivedFrame.staLink.destinationStation.stationIDString);
 
