@@ -1,5 +1,4 @@
 using System;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace TNCKissInterface
@@ -155,13 +154,19 @@ namespace TNCKissInterface
 
         static Byte[] MD5ByteHash(Byte [] iBuf)
         {
-            //
-            // Calculate the MD5 hash of the supplied buffer
-            //
-            MD5 hash = MD5.Create();
-            Byte[] retBuf = hash.ComputeHash(iBuf);
-            hash.Clear();
-            return retBuf;
+            /*
+             * 2026-08-06: Calculate the MD5 hash with BouncyCastle so challenge
+             * responses remain byte-compatible without introducing a Microsoft
+             * cryptographic provider or an x86-only MD5lib assembly dependency.
+             */
+            Org.BouncyCastle.Crypto.Digests.MD5Digest hash =
+                new Org.BouncyCastle.Crypto.Digests.MD5Digest();
+            Byte[] retHash = new Byte[hash.GetDigestSize()];
+
+            /* Supply the complete input and copy the finalized 16-byte digest. */
+            hash.BlockUpdate(iBuf, 0, iBuf.Length);
+            hash.DoFinal(retHash, 0);
+            return retHash;
         }
     }
 }
