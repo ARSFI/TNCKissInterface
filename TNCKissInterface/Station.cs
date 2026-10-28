@@ -102,6 +102,42 @@ namespace TNCKissInterface
 
             return tmpSL;
         }
+        /*
+         * 2026-10-28: Return an independent reversed route for a newly originated
+         * reply. Received relay H bits describe the old journey, so must be clear
+         * for the reply's journey. Keep Rev() unchanged for existing callers.
+         */
+        internal Station ReverseForResponse()
+        {
+            /* Reuse the established endpoint/relay reversal, then detach all
+             * addresses so response construction cannot alter the received frame. */
+            Station response = Rev();
+            response.sourceStation = CopyForResponse(response.sourceStation);
+            response.destinationStation = CopyForResponse(response.destinationStation);
+            response.relayStation1 = CopyForResponse(response.relayStation1);
+            response.relayStation2 = CopyForResponse(response.relayStation2);
+            return response;
+        }
+
+        /*
+         * 2026-10-28: Return a detached address without old C/H or extension bits.
+         * The existing frame encoder sets the response and final-address bits.
+         * Copy bytes directly rather than reparsing potentially malformed input.
+         */
+        private static StationAddress CopyForResponse(StationAddress address)
+        {
+            /* Preserve the decoded identity and reserved bits in a fresh object. */
+            StationAddress copy = new StationAddress();
+            copy.stationIDString = address.stationIDString;
+            copy.stationSSID = address.stationSSID;
+            copy.stationBytes = (Byte[])address.stationBytes.Clone();
+
+            /* A new frame has not traversed any relay yet. */
+            copy.stationBytes[6] &= 0x7e;
+            copy.chBit = 0;
+            copy.extBit = 0;
+            return copy;
+        }
         public Int32 numRelays
         {
             get

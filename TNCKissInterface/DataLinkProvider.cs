@@ -321,6 +321,69 @@ namespace TNCKissInterface
             return retCon;
         }
 
+        /*
+         * 2026-10-28: Find the owner of a received frame, returning null if none is
+         * unambiguous. PacComm DIGI-SWAP can replace an alias with the relay's call.
+         * Keep exact-path lookup first; only the fallback disregards relay names.
+         * It never changes the configured transmit route or connection state.
+         */
+        internal Connection GetReceivedConnection(Frame.ReceivedFrame frame)
+        {
+            /* Preserve the original lookup and its precedence for normal paths. */
+            string reversePath = frame.staLink.GetConnectionPathRev();
+            lock (connectionList)
+            {
+                foreach (Connection connection in connectionList)
+                {
+                    if (connection.connectedStation.GetConnectionPath() == reversePath)
+                        return connection;
+                }
+
+                /* Accept only valid, completely repeated one- or two-hop paths. */
+                Station received = frame.staLink;
+                if (!frame.decodeOK || received.numRelays == 0 ||
+                    !StationAddress.IsValidCallSign(received.sourceStation.stationIDString) ||
+                    !StationAddress.IsValidCallSign(received.destinationStation.stationIDString) ||
+                    !StationAddress.IsValidCallSign(received.relayStation1.stationIDString) ||
+                    received.relayStation1.chBit != 1 ||
+                    (received.numRelays == 2 &&
+                     (!StationAddress.IsValidCallSign(received.relayStation2.stationIDString) ||
+                      received.relayStation2.chBit != 1)))
+                    return null;
+
+                /* Count all active endpoint matches before considering hop count.
+                 * Two simultaneous routes to the same endpoint must not be guessed.
+                 * Use the existing list lock only; do not acquire connection locks
+                 * here or introduce route writes racing timers and transmitters. */
+                Connection candidate = null;
+                foreach (Connection connection in connectionList)
+                {
+                    Station configured = connection.connectedStation;
+                    if (connection.connectState != Connection.ConnectionState.Disconnected &&
+                        configured.sourceStation.stationIDString == received.destinationStation.stationIDString &&
+                        configured.destinationStation.stationIDString == received.sourceStation.stationIDString)
+                    {
+                        if (candidate != null)
+                            return null;
+                        candidate = connection;
+                    }
+                }
+                if (candidate == null || candidate.connectedStation.numRelays != received.numRelays)
+                    return null;
+
+                /* During establishment, only final handshake responses may use the
+                 * fallback. The connection's existing handler still owns the state
+                 * transition. Established/disconnecting links also need substituted
+                 * data, acknowledgements and disconnect replies delivered normally. */
+                if (candidate.connectState == Connection.ConnectionState.ConnectPending &&
+                    (frame.cmdResp != Frame.PacketType.Response || frame.pfBit != 1 ||
+                     (frame.frameType != Frame.FrameTypes.UAType &&
+                      frame.frameType != Frame.FrameTypes.DMType &&
+                      frame.frameType != Frame.FrameTypes.FRMRType)))
+                    return null;
+                return candidate;
+            }
+        }
         public Connection GetAvailableConnection(String stationID)
         {
             //
@@ -780,7 +843,7 @@ namespace TNCKissInterface
                                 }
                                 packet.receivedFrame.iBuf.CopyTo(tBuf, i);
                                 Frame.Packet tmpP = new Frame.Packet(
-                                    Frame.TransmitFrameBuild(packet.receivedFrame.staLink.Rev(),
+                                    Frame.TransmitFrameBuild(packet.receivedFrame.staLink.ReverseForResponse(),
                                         Station.CommandResponse.DoResponse,
                                         pfBit, Frame.FrameTypes.TESTType,
                                         tBuf));
@@ -800,7 +863,7 @@ namespace TNCKissInterface
                         // Other packet types get sent to the upper layer (If one is available)
                         //
 
-                        con = GetConnection(packet.receivedFrame.staLink.GetConnectionPathRev());
+                        con = GetReceivedConnection(packet.receivedFrame);
                         if (con == null)
                         {
                             /*
@@ -844,7 +907,7 @@ namespace TNCKissInterface
                                 //
                                 // No connection so send DM resp with PF bit set to uframe.pfBit 
                                 //
-                                _localTncChannel.Send(Frame.TransmitFrameBuild(packet.receivedFrame.staLink.Rev(),
+                                _localTncChannel.Send(Frame.TransmitFrameBuild(packet.receivedFrame.staLink.ReverseForResponse(),
                                     Station.CommandResponse.DoResponse, pfBit, Frame.FrameTypes.DMType, null).ibuf);
                                 continue;
                             }
